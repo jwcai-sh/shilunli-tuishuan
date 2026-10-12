@@ -175,6 +175,17 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/renderers/CSS2DRenderer.js"></script>
   <script>
+    const queryParams = new URLSearchParams(window.location.search);
+    let localizedLabels = {};
+    try {
+      localizedLabels = JSON.parse(queryParams.get("labels") || "{}");
+    } catch {
+      localizedLabels = {};
+    }
+    const labelText = (key, fallback) => localizedLabels[key] || fallback;
+    document.title = labelText("pageTitle", document.title);
+    document.querySelector('label[for="dateInput"]').textContent = labelText("datePrompt", "选择日期：");
+
     // 场景初始化
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(
@@ -422,7 +433,7 @@
       "巨蟹宫",
       "狮子宫",
       "处女宫",
-    ];
+    ].map((name, index) => localizedLabels.zodiac?.[index] || name);
 
     for (let i = 0; i < 12; i++) {
       const angle = (i * Math.PI) / 6;
@@ -463,7 +474,7 @@
         color: 0x99ccff,
         glowColor: 0xccebff,
       },
-    ];
+    ].map((point, index) => ({ ...point, name: localizedLabels.seasons?.[index] || point.name }));
 
     seasonPoints.forEach((point) => {
       // 创建核心点 - 更大更亮
@@ -559,7 +570,7 @@
     function updateDate() {
       const dateInput = document.getElementById("dateInput");
       if (!dateInput.value) {
-        alert("请选择有效的日期和时间！");
+        alert(labelText("invalidDate", "请选择有效的日期和时间！"));
         return;
       }
       currentDate = new Date(dateInput.value);
@@ -592,10 +603,10 @@
 
       // 更新信息显示
       const info = document.getElementById("info");
-      info.textContent = `观测日期: ${currentDate.toLocaleDateString()}
-地球的黄经: ${positions.earthLongitude.toFixed(2)}°
-太阳的视黄经: ${positions.sunLongitude.toFixed(2)}°
-太阳位于: ${currentZodiac}`;
+      info.textContent = `${labelText("observationDate", "观测日期")}: ${currentDate.toLocaleDateString()}
+${labelText("earthLongitude", "地球的黄经")}: ${positions.earthLongitude.toFixed(2)}°
+${labelText("sunLongitude", "太阳的视黄经")}: ${positions.sunLongitude.toFixed(2)}°
+${labelText("sunLocated", "太阳位于")}: ${currentZodiac}`;
     }
 
     // 动画循环
@@ -631,10 +642,10 @@
 
       // 更新信息显示
       const info = document.getElementById("info");
-      info.textContent = `观测日期: ${currentDate.toLocaleDateString()}
-地球的黄经: ${positions.earthLongitude.toFixed(2)}°
-太阳的视黄经: ${positions.sunLongitude.toFixed(2)}°
-太阳位于: ${currentZodiac}`;
+      info.textContent = `${labelText("observationDate", "观测日期")}: ${currentDate.toLocaleDateString()}
+${labelText("earthLongitude", "地球的黄经")}: ${positions.earthLongitude.toFixed(2)}°
+${labelText("sunLongitude", "太阳的视黄经")}: ${positions.sunLongitude.toFixed(2)}°
+${labelText("sunLocated", "太阳位于")}: ${currentZodiac}`;
 
       controls.update();
       renderer.render(scene, camera);

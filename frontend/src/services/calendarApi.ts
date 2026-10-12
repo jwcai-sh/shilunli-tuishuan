@@ -1,3 +1,5 @@
+import { DEFAULT_CITY } from "@/constants/cities";
+
 export interface CalendarApiResponse {
   success: boolean;
   data?: {
@@ -14,6 +16,12 @@ export interface CalendarApiResponse {
         tibetanHoliday?: { name: string; date: string; daysLeft: number };
       };
     };
+    tibetanDate: {
+      year: number;
+      month: number;
+      day: number;
+      label: string;
+    } | null;
     astrologicalTable: {
       tibetanDate: string;
       tableData: Array<{
@@ -49,10 +57,26 @@ export interface CalendarApiResponse {
 
 const API_BASE = "/api";
 
+export type AstronomyEventType =
+  | "new_moon" | "full_moon"
+  | "solar_partial" | "solar_total" | "solar_annular" | "solar_hybrid"
+  | "lunar_partial" | "lunar_total" | "lunar_penumbral";
+
+export type CalendarDisplayMode = "astronomy" | "tibetan";
+export type CalendarEventType = AstronomyEventType | "tibetan_festival";
+
+export interface MonthlyCalendarEvent {
+  date: string;
+  type: CalendarEventType;
+  label: string;
+  time?: string;
+  tibetanDate?: string;
+}
+
 export async function fetchCalendarData(params?: { date?: string; cityName?: string }): Promise<CalendarApiResponse["data"]> {
   const body = {
     date: params?.date,
-    cityName: params?.cityName || "上海市"
+    cityName: params?.cityName || DEFAULT_CITY
   };
 
   const res = await fetch(`${API_BASE}/calendar/date-comprehensive-data`, {
@@ -62,7 +86,7 @@ export async function fetchCalendarData(params?: { date?: string; cityName?: str
   });
 
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`);
+    throw new Error(`服务状态码 ${res.status}`);
   }
   const json: CalendarApiResponse = await res.json();
   if (!json.success) {
@@ -71,4 +95,24 @@ export async function fetchCalendarData(params?: { date?: string; cityName?: str
   return json.data!;
 }
 
+export async function fetchMonthlyAstronomyEvents(year: number, month: number): Promise<MonthlyCalendarEvent[]> {
+  const response = await fetch(`${API_BASE}/calendar/monthly-astronomy-events`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ year, month }),
+  });
+  const json = await response.json() as { success: boolean; data?: { events?: MonthlyCalendarEvent[] }; error?: { message?: string } };
+  if (!response.ok || !json.success) throw new Error(json.error?.message || `服务状态码 ${response.status}`);
+  return json.data?.events || [];
+}
 
+export async function fetchMonthlyTibetanFestivals(year: number, month: number): Promise<MonthlyCalendarEvent[]> {
+  const response = await fetch(`${API_BASE}/calendar/monthly-tibetan-festivals`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ year, month }),
+  });
+  const json = await response.json() as { success: boolean; data?: { events?: MonthlyCalendarEvent[] }; error?: { message?: string } };
+  if (!response.ok || !json.success) throw new Error(json.error?.message || `服务状态码 ${response.status}`);
+  return json.data?.events || [];
+}

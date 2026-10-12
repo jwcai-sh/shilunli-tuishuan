@@ -381,11 +381,11 @@
       <form id="astroForm">
         <div class="form-group">
           <label for="latitude">纬度</label>
-          <input type="number" id="latitude" step="0.01" required placeholder="例如：31.35" />
+          <input type="number" id="latitude" step="any" required placeholder="例如：31.35" />
         </div>
         <div class="form-group">
           <label for="longitude">经度</label>
-          <input type="number" id="longitude" step="0.01" required placeholder="例如：121.43" />
+          <input type="number" id="longitude" step="any" required placeholder="例如：121.43" />
         </div>
         <div class="form-group">
           <label for="date">日期</label>
@@ -430,6 +430,18 @@
       CSS2DRenderer,
       CSS2DObject,
     } from "three/addons/renderers/CSS2DRenderer.js";
+
+    const queryParams = new URLSearchParams(window.location.search);
+    let localizedLabels = {};
+    try {
+      localizedLabels = JSON.parse(queryParams.get("labels") || "{}");
+    } catch (error) {
+      console.warn("Unable to parse localized visualization labels", error);
+    }
+    const labelText = (key, fallback) => localizedLabels[key] || fallback;
+    const uiLocale = queryParams.get("locale") || "zh";
+    document.documentElement.lang = uiLocale === "bo" ? "bo" : "zh-CN";
+    document.title = labelText("visualizationTitle", document.title);
 
     let scene, camera, renderer, labelRenderer, controls;
     let celestialObjects = [];
@@ -525,7 +537,7 @@
       scene.add(axesHelper);
 
       // 重新添加方位标签
-      const orientationLabels = ["东", "北", "西", "南"];
+      const orientationLabels = [labelText("east", "东"), labelText("north", "北"), labelText("west", "西"), labelText("south", "南")];
       for (let i = 0; i < 4; i++) {
         // 修改循环次数为4
         const angle = (i * Math.PI * 2) / 4; // 修改角度计算，现在每90度一个标签
@@ -635,7 +647,8 @@
         const planetNames = ["水星", "金星", "火星", "木星", "土星"];
         planetNames.forEach((name) => {
           if (planetsData[name]) {
-            resultHTML += `<p>${name}赤纬角: ${planetsData[name].declination}</p>`;
+            const key = { "水星": "mercury", "金星": "venus", "火星": "mars", "木星": "jupiter", "土星": "saturn" }[name];
+            resultHTML += `<p>${labelText(key, name)}${labelText("declination", "赤纬角")}: ${planetsData[name].declination}</p>`;
           }
         });
       }
@@ -834,7 +847,8 @@
             /*
             // 添加行星标签
             const labelDiv = document.createElement("div");
-            labelDiv.textContent = planetName;
+            const planetLabelKey = { "水星": "mercury", "金星": "venus", "火星": "mars", "木星": "jupiter", "土星": "saturn" }[planetName];
+            labelDiv.textContent = labelText(planetLabelKey, planetName);
             labelDiv.style.color =
               "#" + planetColors[planetName].toString(16).padStart(6, "0");
             labelDiv.style.fontSize = "14px";
@@ -1254,7 +1268,7 @@
       // 添加天极点标签
       const northPoleDiv = document.createElement("div");
       northPoleDiv.className = "orientation-label";
-      northPoleDiv.textContent = "北天极";
+      northPoleDiv.textContent = labelText("northPole", "北天极");
       northPoleDiv.style.color = "#ffffff";
       northPoleDiv.style.fontSize = "14px";
       northPoleDiv.style.fontWeight = "bold";
@@ -1266,7 +1280,7 @@
 
       const southPoleDiv = document.createElement("div");
       southPoleDiv.className = "orientation-label";
-      southPoleDiv.textContent = "南天极";
+      southPoleDiv.textContent = labelText("southPole", "南天极");
       southPoleDiv.style.color = "#ffffff";
       southPoleDiv.style.fontSize = "14px";
       southPoleDiv.style.fontWeight = "bold";
@@ -1277,7 +1291,7 @@
       labels.push(southPoleLabel);
 
       // 重新添加方位标签
-      const orientationLabels = ["东", "北", "西", "南"];
+      const orientationLabels = [labelText("east", "东"), labelText("north", "北"), labelText("west", "西"), labelText("south", "南")];
       for (let i = 0; i < 4; i++) {
         // 修改循环次数为4
         const angle = (i * Math.PI * 2) / 4; // 修改角度计算，现在每90度一个标签
@@ -1322,10 +1336,25 @@
     animate();
 
     // 设置默认值并自动提交表单
-    window.addEventListener("load", function () {
-      const searchParams = new URLSearchParams(window.location.search);
+    function initializeForm() {
+      const searchParams = queryParams;
       const latFromQuery = searchParams.get("lat");
       const lonFromQuery = searchParams.get("lon");
+      const fieldLabels = { latitude: "纬度", longitude: "经度", date: "日期", time: "时间" };
+      for (const [field, fallback] of Object.entries(fieldLabels)) {
+        const label = document.querySelector(`label[for="${field}"]`);
+        if (label) label.textContent = labelText(field, fallback);
+      }
+      const submitButton = document.querySelector('#astroForm button[type="submit"]');
+      if (submitButton) submitButton.textContent = labelText("submit", "查询并可视化");
+      document.querySelectorAll("#celestialControls label[data-celestial]").forEach((label) => {
+        const input = label.querySelector("input");
+        const key = label.dataset.celestial;
+        label.textContent = labelText(key, label.textContent.trim());
+        if (input) label.prepend(input);
+      });
+      document.getElementById("latitude").placeholder = `${labelText("example", "例如")}：31.35`;
+      document.getElementById("longitude").placeholder = `${labelText("example", "例如")}：121.43`;
       document.getElementById("latitude").value = latFromQuery || "31.23";
       document.getElementById("longitude").value = lonFromQuery || "121.47";
 
@@ -1339,9 +1368,7 @@
       const hours = String(today.getHours()).padStart(2, "0");
       const minutes = String(today.getMinutes()).padStart(2, "0");
       document.getElementById("time").value = `${hours}:${minutes}`;
-      // 自动提交表单
-      document.getElementById("astroForm").requestSubmit();
-    });
+    }
 
     // 表单提交处理
     document
@@ -1363,6 +1390,9 @@
             body: JSON.stringify({ latitude, longitude, date, time }),
           });
           const sunMoonData = await sunMoonResponse.json();
+          if (!sunMoonResponse.ok) {
+            throw new Error(sunMoonData.error || "太阳和月亮数据查询失败");
+          }
 
           // 获取行星数据
           const planetsResponse = await fetch("/api/planets", {
@@ -1373,6 +1403,9 @@
             body: JSON.stringify({ latitude, longitude, date, time }),
           });
           const planetsJson = await planetsResponse.json();
+          if (!planetsResponse.ok || !planetsJson.success) {
+            throw new Error(planetsJson.error?.message || "行星数据查询失败");
+          }
           let planetsData = planetsJson.data; // Extract the nested data object
 
           // 修复：后端返回的是英文字母键名，前端需要中文键名
@@ -1400,9 +1433,19 @@
         } catch (error) {
           console.error("Error:", error);
           document.getElementById("result").innerHTML =
-            "获取数据时出错，请重试";
+            labelText("error", "获取数据时出错，请重试");
         }
       });
+
+    const initializeAndSubmit = () => {
+      initializeForm();
+      document.getElementById("astroForm").requestSubmit();
+    };
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initializeAndSubmit, { once: true });
+    } else {
+      initializeAndSubmit();
+    }
   </script>
   <script>
     const sliderContainer = document.getElementById("sliderContainer");
